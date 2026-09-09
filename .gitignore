@@ -1,0 +1,22 @@
+# Python / Django
+__pycache__/
+*.pyc
+backend/.env
+backend/staticfiles/
+backend/db.sqlite3
+
+# Node / React
+node_modules/
+frontend/dist/
+frontend/.env
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+
+# Misc
+.DS_Store
+*.log

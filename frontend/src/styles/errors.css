@@ -1,0 +1,89 @@
+.error-page {
+  --paper: #efe8d8;
+  --paper-2: #e6dec9;
+  --ink: #24211b;
+  --ink-soft: #5b564a;
+  --indigo: #2e4159;
+  --turmeric: #c68a2e;
+  --signal: #a63d2f;
+
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", sans-serif;
+  padding: 24px;
+}
+
+.error-page__card {
+  max-width: 480px;
+  width: 100%;
+}
+
+.error-page__rule {
+  height: 3px;
+  width: 56px;
+  background: var(--turmeric);
+  margin-bottom: 22px;
+}
+
+.error-page__code {
+  font-family: "Newsreader", serif;
+  font-size: 4.5rem;
+  line-height: 1;
+  margin-bottom: 8px;
+  color: var(--indigo);
+}
+
+.error-page__code--signal {
+  color: var(--signal);
+}
+
+.error-page__code--turmeric {
+  color: var(--turmeric);
+}
+
+.error-page__heading {
+  font-family: "Newsreader", serif;
+  font-weight: 500;
+  font-size: 1.5rem;
+  margin: 0 0 12px;
+}
+
+.error-page__message {
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+  line-height: 1.55;
+  margin: 0 0 22px;
+}
+
+.error-page__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.error-page__btn {
+  display: inline-block;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 11px 20px;
+  border-radius: 2px;
+  border: 1px solid var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.error-page__btn--primary {
+  background: var(--indigo);
+  color: var(--paper);
+  border-color: var(--indigo);
+}
+
+.error-page__btn--secondary {
+  background: transparent;
+  color: var(--ink);
+}

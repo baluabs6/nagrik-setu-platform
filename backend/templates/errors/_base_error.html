@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Error — Nagrik Setu{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EFE8D8; --paper-2:#E6DEC9; --ink:#24211B; --ink-soft:#5B564A;
+    --indigo:#2E4159; --turmeric:#C68A2E; --signal:#A63D2F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans', sans-serif;
+    padding:24px;
+  }
+  .card{max-width:480px; width:100%; text-align:left;}
+  .code{
+    font-family:'Newsreader', serif; font-size:4.5rem; line-height:1;
+    color:var(--code-color, var(--indigo)); margin-bottom:8px;
+  }
+  h1{font-family:'Newsreader', serif; font-weight:500; font-size:1.5rem; margin:0 0 12px;}
+  p{color:var(--ink-soft); font-size:0.98rem; line-height:1.55; margin:0 0 22px;}
+  .actions{display:flex; gap:12px; flex-wrap:wrap;}
+  a.btn{
+    display:inline-block; text-decoration:none; font-weight:600; font-size:0.9rem;
+    padding:11px 20px; border-radius:2px; border:1px solid var(--ink);
+  }
+  a.btn.primary{background:var(--indigo); color:var(--paper); border-color:var(--indigo);}
+  a.btn.secondary{background:transparent; color:var(--ink);}
+  .rule{height:3px; width:56px; background:var(--turmeric); margin-bottom:22px;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="rule"></div>
+    <div class="code">{% block code %}{% endblock %}</div>
+    <h1>{% block heading %}{% endblock %}</h1>
+    <p>{% block message %}{% endblock %}</p>
+    <div class="actions">
+      <a class="btn primary" href="/">Back to home</a>
+      <a class="btn secondary" href="mailto:support@nagriksetu.in">Contact support</a>
+    </div>
+  </div>
+</body>
+</html>

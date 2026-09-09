@@ -1,0 +1,5 @@
+{% extends "errors/_base_error.html" %}
+{% block title %}503 · Temporarily unavailable{% endblock %}
+{% block code %}<span style="--code-color: var(--turmeric); color: var(--turmeric);">503</span>{% endblock %}
+{% block heading %}We'll be right back{% endblock %}
+{% block message %}The service is temporarily unavailable — either scheduled maintenance or a failover to our disaster-recovery region is in progress. This usually resolves within a few minutes.{% endblock %}

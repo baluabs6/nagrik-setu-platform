@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nagrik-setu-backend
+  labels: { app: nagrik-setu-backend }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: nagrik-setu-backend }
+  template:
+    metadata:
+      labels: { app: nagrik-setu-backend }
+    spec:
+      containers:
+        - name: backend
+          image: nagriksetudrregistry.azurecr.io/nagrik-setu-backend:latest
+          ports: [{ containerPort: 8000 }]
+          envFrom:
+            - secretRef: { name: nagrik-setu-secrets }
+          readinessProbe:
+            httpGet: { path: /healthz/, port: 8000 }
+            initialDelaySeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz/, port: 8000 }
+            initialDelaySeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nagrik-setu-backend
+spec:
+  selector: { app: nagrik-setu-backend }
+  ports: [{ port: 8000, targetPort: 8000 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nagrik-setu-frontend
+  labels: { app: nagrik-setu-frontend }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: nagrik-setu-frontend }
+  template:
+    metadata:
+      labels: { app: nagrik-setu-frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: nagriksetudrregistry.azurecr.io/nagrik-setu-frontend:latest
+          ports: [{ containerPort: 80 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nagrik-setu-frontend
+spec:
+  type: LoadBalancer
+  selector: { app: nagrik-setu-frontend }
+  ports: [{ port: 443, targetPort: 80 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nagrik-setu-ingress
+  annotations:
+    kubernetes.io/ingress.class: "azure/application-gateway"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+    - hosts: ["dr.nagriksetu.in"]
+      secretName: nagrik-setu-dr-tls
+  rules:
+    - host: dr.nagriksetu.in
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: nagrik-setu-backend, port: { number: 8000 } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: nagrik-setu-frontend, port: { number: 443 } }
