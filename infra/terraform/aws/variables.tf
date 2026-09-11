@@ -117,3 +117,16 @@ variable "enable_dr_replication" {
   type        = bool
   default     = false
 }
+
+variable "backend_internal_url" {
+  description = "VPC-internal URL of the Django backend (NOT the public domain), used by the upload-validation Lambda's verification callback."
+  type        = string
+  default     = ""
+}
+
+variable "internal_service_token" {
+  description = "Shared secret the upload-validation Lambda presents to the backend's internal-only mark-attachment-verified endpoint. Source from Vault/CI secrets at apply time — never commit a real value here."
+  type        = string
+  default     = "*******"
+  sensitive   = true
+}

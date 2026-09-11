@@ -14,8 +14,20 @@ environ.Env.read_env(BASE_DIR / ".env")
 # --- Vault-backed secrets (falls back to env vars if Vault is unreachable) ---
 from core.vault_client import get_secret  # noqa: E402
 
-SECRET_KEY = get_secret("django_secret_key", default=env("DJANGO_SECRET_KEY", default="dev-insecure-key"))
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
+# The "*******-local-dev-only" fallback is intentionally obviously-fake so
+# it can never be mistaken for a real value; it only applies when DEBUG is
+# on. Any non-debug deployment must supply a real key via Vault/.env or
+# fail loudly rather than silently run with a guessable secret key.
+_SECRET_KEY_FALLBACK = "*******-local-dev-only" if DEBUG else None
+SECRET_KEY = get_secret(
+    "django_secret_key", default=env("DJANGO_SECRET_KEY", default=_SECRET_KEY_FALLBACK)
+)
+if not SECRET_KEY:
+    raise RuntimeError(
+        "DJANGO_SECRET_KEY is not set. Provide it via Vault (django_secret_key) or the "
+        "DJANGO_SECRET_KEY env var — refusing to start without one outside DEBUG mode."
+    )
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
 INSTALLED_APPS = [
@@ -94,7 +106,14 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "user": "300/min"},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/min",
+        "user": "300/min",
+        # Tighter, separate scope for upvote so a script can't hammer a
+        # single issue's vote count even from an authenticated account;
+        # combined with the per-IP dedupe cache check in views.py.
+        "upvote": "10/min",
+    },
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
@@ -117,6 +136,43 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localho
 AWS_REGION = env("AWS_REGION", default="ap-south-1")
 AWS_STORAGE_BUCKET_NAME = env("AWS_S3_BUCKET", default="nagrik-setu-uploads")
 AWS_DYNAMODB_TABLE = env("AWS_DYNAMODB_TABLE", default="nagrik-setu-events")
+
+# --- Uploaded-photo verification (see apps/issues/models.py, views.py,
+# backend/lambda/upload_validation/) ---
+# Off by default so local/demo setups without the Lambda deployed still
+# show photos immediately; turn on in any real deployment.
+REQUIRE_ATTACHMENT_VERIFICATION = env.bool("REQUIRE_ATTACHMENT_VERIFICATION", default=False)
+
+# Shared secret the upload-validation Lambda presents when calling back to
+# /api/v1/internal/mark-attachment-verified/ (core/internal_views.py).
+# Sourced from Vault in real deployments, same pattern as every other
+# secret in this file.
+INTERNAL_SERVICE_TOKEN = get_secret(
+    "internal_service_token", default=env("INTERNAL_SERVICE_TOKEN", default="")
+)
+
+# --- Agentic AI auto-triage (see core/ai_triage.py) ---
+# Off by default: enabling it means calling an external LLM API with
+# citizen-submitted text, which a deployer should opt into deliberately
+# (cost, data-handling policy, provider choice) rather than get by default.
+ENABLE_AI_TRIAGE = env.bool("ENABLE_AI_TRIAGE", default=False)
+ANTHROPIC_API_KEY = get_secret(
+    "anthropic_api_key", default=env("ANTHROPIC_API_KEY", default="")
+)
+
+# --- Security headers ---
+# Only enforced when DEBUG is off, so local `docker-compose up` over plain
+# HTTP still works without fighting HSTS/redirect loops.
+if not DEBUG:
+    SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
+    SECURE_HSTS_SECONDS = env.int("DJANGO_HSTS_SECONDS", default=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

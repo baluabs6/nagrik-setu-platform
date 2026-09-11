@@ -74,14 +74,6 @@ resource "aws_lambda_permission" "allow_s3" {
   source_arn    = aws_s3_bucket.uploads.arn
 }
 
-resource "aws_s3_bucket_notification" "uploads_thumbnail_trigger" {
-  bucket = aws_s3_bucket.uploads.id
-
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.thumbnail.arn
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "issue-attachments/"
-  }
-
-  depends_on = [aws_lambda_permission.allow_s3]
-}
+# The actual aws_s3_bucket_notification resource lives in
+# s3-notifications.tf alongside the upload-validation Lambda's trigger —
+# see the note there for why they can't each declare their own.

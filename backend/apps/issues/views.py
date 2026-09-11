@@ -7,7 +7,9 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
+from core.ai_triage import triage_issue
 from .models import Issue
 from .serializers import IssueSerializer
 from .permissions import IsStaffForStatusChange
@@ -16,6 +18,19 @@ logger = logging.getLogger(__name__)
 
 STATS_CACHE_KEY = "issue_stats_v1"
 STATS_CACHE_TTL_SECONDS = 60
+
+# One vote per issue per client per day. Cheap, dependency-free abuse
+# control against a single IP scripting repeated upvote calls; not a
+# substitute for the ScopedRateThrottle below, which limits call *rate*
+# regardless of target.
+UPVOTE_DEDUPE_TTL_SECONDS = 24 * 60 * 60
+
+
+def _client_ip(request) -> str:
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "unknown")
 
 
 def _log_to_dynamodb(issue: Issue):
@@ -44,6 +59,25 @@ def _log_to_dynamodb(issue: Issue):
         logger.warning("DynamoDB audit write skipped: %s", exc)
 
 
+def _run_ai_triage(issue: Issue) -> None:
+    """Best-effort AI auto-triage agent (see core/ai_triage.py). Disabled
+    unless ENABLE_AI_TRIAGE is set; never blocks or fails the request."""
+    try:
+        result = triage_issue(
+            category_choices=[choice.value for choice in Issue.Category],
+            category=issue.category,
+            description=issue.description,
+        )
+        if result is None:
+            return
+        issue.ai_suggested_category = result.suggested_category
+        issue.ai_urgency = result.urgency
+        issue.ai_confidence = result.confidence
+        issue.save(update_fields=["ai_suggested_category", "ai_urgency", "ai_confidence", "updated_at"])
+    except Exception:  # noqa: BLE001
+        logger.exception("AI triage post-processing failed for issue %s", issue.id)
+
+
 class IssueViewSet(viewsets.ModelViewSet):
     queryset = Issue.objects.all()
     serializer_class = IssueSerializer
@@ -54,14 +88,26 @@ class IssueViewSet(viewsets.ModelViewSet):
         issue = serializer.save()
         cache.delete(STATS_CACHE_KEY)
         _log_to_dynamodb(issue)
+        _run_ai_triage(issue)
 
-    @action(detail=True, methods=["patch"])
+    @action(detail=True, methods=["patch"], throttle_classes=[ScopedRateThrottle])
     def upvote(self, request, pk=None):
         issue = self.get_object()
+
+        dedupe_key = f"upvote:{issue.id}:{_client_ip(request)}"
+        if cache.get(dedupe_key):
+            return Response(
+                {"error": "already_voted", "message": "You've already upvoted this report recently."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
         issue.votes += 1
         issue.save(update_fields=["votes", "updated_at"])
+        cache.set(dedupe_key, True, UPVOTE_DEDUPE_TTL_SECONDS)
         _log_to_dynamodb(issue)
         return Response(IssueSerializer(issue).data, status=status.HTTP_200_OK)
+
+    upvote.throttle_scope = "upvote"
 
     @action(detail=False, methods=["get"])
     def stats(self, request):
@@ -103,6 +149,16 @@ class IssueViewSet(viewsets.ModelViewSet):
             import boto3
 
             client = boto3.client("s3", region_name=settings.AWS_REGION)
+            # A presigned PUT can't itself enforce a max size, and nothing
+            # here verifies the bytes actually match `content_type` — a
+            # client can declare "image/jpeg" and upload anything. The real
+            # enforcement point is the S3-triggered upload-validation
+            # Lambda (backend/lambda/upload_validation/handler.py, wired up
+            # in infra/terraform/aws/upload-validation.tf), which sniffs
+            # the real file type/size after upload, strips EXIF/GPS from
+            # genuine images, and deletes anything that doesn't qualify.
+            # `Issue.attachment_verified` only flips to True once that
+            # Lambda has approved the object (see models.py, serializers.py).
             upload_url = client.generate_presigned_url(
                 "put_object",
                 Params={

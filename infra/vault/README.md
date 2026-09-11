@@ -14,7 +14,11 @@ vault kv put secret/nagrik-setu \
   django_secret_key="$(openssl rand -hex 32)" \
   postgres_db="nagrik_setu" \
   postgres_user="nagrik_setu" \
-  postgres_password="<strong-password>"
+  postgres_password="*******" \
+  internal_service_token="$(openssl rand -hex 32)" \
+  anthropic_api_key="*******"
+# Replace every ******* with the real value from your own secret store —
+# never a value typed or committed here.
 
 # 3. Load the least-privilege policy
 vault policy write nagrik-setu-app nagrik-setu-app-policy.hcl

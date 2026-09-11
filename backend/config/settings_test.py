@@ -16,3 +16,11 @@ CACHES = {
 }
 
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]  # faster tests
+
+# The test client always talks plain HTTP with no TLS-terminating proxy in
+# front of it, so the production-only security headers added in
+# settings.py (SECURE_SSL_REDIRECT etc.) must be off here, exactly as they
+# would be in local dev behind a real load balancer that already redirects.
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
